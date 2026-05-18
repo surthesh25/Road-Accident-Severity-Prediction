@@ -6,3 +6,5 @@ scikit-learn>=0.24.0
 imbalanced-learn>=0.8.0
 shap>=0.41.0
 lime>=0.2.0
+streamlit>=1.20.0
+plotly>=5.0.0

@@ -1,8 +1,10 @@
 # 🚗 Road Accident Severity Analysis
 
-A machine learning project that analyses road accident data to predict and understand **accident severity** using classification models and explainability tools (SHAP, LIME, PDP).
+A machine learning project that analyses road accident data to **predict and explain accident severity** using classification models and explainability tools (SHAP, LIME, PDP).
 
-The project addresses four research questions across driver behaviour, environmental conditions, temporal/weather factors, and overall feature interactions.
+The project includes two components:
+- **`crash_analysis.py`** — Full offline analysis script with EDA, modelling, and evaluation
+- **`app.py`** — Interactive Streamlit dashboard for exploring results visually
 
 ---
 
@@ -12,7 +14,7 @@ The project addresses four research questions across driver behaviour, environme
 |---|---|---|
 | **RQ1** | How do driver-related factors (age, gender, alcohol, fatigue) influence accident severity? | Logistic Regression |
 | **RQ2** | How do environmental factors (traffic volume, population density, urban/rural) affect severity? | Random Forest |
-| **RQ3** | What is the impact of temporal and weather conditions (weather, road condition, visibility, time of day) on severity? | Random Forest |
+| **RQ3** | What is the impact of temporal and weather conditions on severity? | Random Forest |
 | **RQ4** | How do all factors interact to determine accident severity? | Random Forest + SHAP + PDP + LIME |
 
 ---
@@ -22,13 +24,15 @@ The project addresses four research questions across driver behaviour, environme
 ```
 Crash-Analytics/
 │
-├── Dataset/                        # Raw data 
-│   └── Road_Accident_Dataset.csv
+├── Dataset/
+│   ├── Road_Accident_Dataset.csv            # Original dataset
+│   └── Fine-Tuned_Road_Accident_Dataset.csv # Fine-tuned dataset (used by app)
 │
 ├── src/
-│   └── crash_analysis.py           # Main script: EDA → modelling → explainability
+│   ├── crash_analysis.py                    # Offline analysis: EDA → modelling → explainability
+│   └── app.py                               # Streamlit interactive dashboard
 │
-├── outputs/                        # Auto-generated plots on first run
+├── outputs/                                 # Auto-generated plots (crash_analysis.py)
 │   ├── eda_severity_distribution.png
 │   ├── eda_feature_distributions.png
 │   ├── eda_correlation_heatmap.png
@@ -55,33 +59,30 @@ Crash-Analytics/
 
 ## 📊 Dataset
 
-**File:** `Road_Accident_Dataset.csv`
+**File:** `Road_Accident_Dataset.csv` / `Fine-Tuned_Road_Accident_Dataset.csv`
 
 | Feature | Description |
 |---|---|
 | `Traffic Volume` | Number of vehicles on the road |
 | `Population Density` | Population density of the area |
 | `Speed Limit` | Posted speed limit at the accident location |
-| `Visibility Level` | Visibility score at the time of accident |
+| `Visibility Level` | Visibility score at time of accident |
 | `Driver Alcohol Level` | Blood alcohol concentration of the driver |
 | `Driver Fatigue` | Binary flag — driver fatigue reported |
 | `Pedestrians Involved` | Number of pedestrians involved |
 | `Number of Injuries` | Total injuries recorded |
 | `Number of Fatalities` | Total fatalities recorded |
-| `Emergency Response Time` | Time taken for emergency services to arrive |
+| `Emergency Response Time` | Time for emergency services to arrive |
 | `Medical Cost` | Estimated medical cost of the accident |
 | `Economic Loss` | Total economic loss from the accident |
 | `Road Condition` | Road surface condition (categorical) |
-| `Weather Conditions` | Weather at the time of accident (categorical) |
-| `Urban/Rural` | Whether the accident occurred in an urban or rural area |
+| `Weather Conditions` | Weather at time of accident (categorical) |
+| `Urban/Rural` | Urban or rural accident location |
 | `Driver Age Group` | Age group of the driver (categorical) |
 | `Driver Gender` | Gender of the driver (categorical) |
-| `Vehicle Condition` | Condition of the vehicle involved (categorical) |
+| `Vehicle Condition` | Condition of the vehicle (categorical) |
 | `Time of Day` | Time period of the accident (categorical) |
 | `Accident Severity` | **Target** — severity class of the accident |
-
-> **Note:** The dataset file is not included in this repository.
-> Place `Road_Accident_Dataset.csv` inside the `Dataset/` folder before running the script.
 
 ---
 
@@ -100,66 +101,72 @@ cd Crash-Analytics
 pip install -r requirements.txt
 ```
 
-### 3. Add the dataset
-
-Place your dataset file in the `Dataset/` folder:
-
-```
-Dataset/
-└── Road_Accident_Dataset.csv
-```
-
-### 4. Run the analysis
+### 3. Run the offline analysis script
 
 ```bash
 python src/crash_analysis.py
 ```
 
-The `outputs/` folder is created automatically with all plots and figures.
+Outputs are saved automatically to the `outputs/` folder.
+
+### 4. Run the Streamlit dashboard
+
+```bash
+streamlit run src/app.py
+```
+
+Opens at `http://localhost:8501` in your browser.
 
 ---
 
-## 🔍 Analysis Overview
+## 🖥️ Streamlit Dashboard
 
-### 🧹 Data Quality & EDA
-- Missing value check and outlier detection (IQR method)
-- Class distribution of accident severity
-- Feature distributions (histograms with KDE)
-- Correlation heatmap across all features
-- Driver alcohol level vs severity (box plot)
+The interactive dashboard has two sections:
 
-### 🤖 Modelling Pipeline (per RQ)
-Each research question follows the same pipeline:
+**🏠 Home Page**
+- Project overview and dataset summary
+- Quick statistics (records, features, missing values)
+- Top accident causes and driver age groups
+- Accident severity pie chart
+- Key factors summary
 
-```
-Feature Selection → Scaling (StandardScaler) → SMOTE (class balancing)
-→ Train/Test Split (70/30) → Model Training → Evaluation
-```
+**📚 Research Questions (Sidebar Navigation)**
 
-**Metrics reported for every model:**
-- Accuracy
-- F1 Score (Macro)
-- ROC-AUC (One-vs-Rest)
-- 5-Fold Stratified Cross-Validation Accuracy
-- Confusion Matrix (heatmap)
-- Feature Importance chart
-
-### 🔬 Explainability (RQ4 only)
-| Tool | Output |
+| Page | Content |
 |---|---|
-| **SHAP** | Bar chart (mean \|SHAP\|) + Beeswarm plot |
-| **PDP** | Partial dependence plots for top features |
-| **LIME** | Local explanation for an individual prediction |
+| RQ1 — Driver Factors | Metrics, alcohol distribution, logistic regression coefficients |
+| RQ2 — Environmental | Metrics, traffic volume boxplot, RF feature importance |
+| RQ3 — Weather/Time | Metrics, time of day boxplot, RF feature importance |
+| RQ4 — All Factors | Metrics, overall importance, SHAP beeswarm, PDP plots |
+
+---
+
+## 🔍 Analysis Overview (`crash_analysis.py`)
+
+### Modelling Pipeline (per RQ)
+```
+Feature Selection → StandardScaler → SMOTE → Train/Test Split (70/30)
+→ Model Training → Evaluation (Accuracy, F1, ROC-AUC, 5-Fold CV)
+→ Confusion Matrix → Feature Importance
+```
+
+### Explainability Tools (RQ4)
+
+| Tool | Description |
+|---|---|
+| **SHAP** | Global feature impact via beeswarm + bar chart |
+| **PDP** | Marginal effect of top features on severity |
+| **LIME** | Local explanation for individual predictions |
 
 ---
 
 ## 📈 Model Summary
 
-| RQ | Model | Features Used |
+| RQ | Model | Features |
 |---|---|---|
-| RQ1 | Logistic Regression | Driver Age Group, Driver Gender, Driver Alcohol Level, Driver Fatigue |
+| RQ1 | Logistic Regression | Driver Age Group, Gender, Alcohol Level, Fatigue |
 | RQ2 | Random Forest | Traffic Volume, Population Density, Urban/Rural |
-| RQ3 | Random Forest | Weather Conditions, Road Condition, Visibility Level, Time of Day |
+| RQ3 | Random Forest | Weather Conditions, Road Condition, Visibility, Time of Day |
 | RQ4 | Random Forest | All 18 features |
 
 ---
@@ -174,8 +181,19 @@ Feature Selection → Scaling (StandardScaler) → SMOTE (class balancing)
 | [imbalanced-learn](https://imbalanced-learn.org/) | SMOTE for class imbalance |
 | [SHAP](https://shap.readthedocs.io/) | Global and local model explainability |
 | [LIME](https://lime-ml.readthedocs.io/) | Local instance-level explanation |
-| [Matplotlib](https://matplotlib.org/) | Plotting |
+| [Streamlit](https://streamlit.io/) | Interactive web dashboard |
+| [Plotly](https://plotly.com/python/) | Interactive charts in dashboard |
+| [Matplotlib](https://matplotlib.org/) | Static visualisations |
 | [Seaborn](https://seaborn.pydata.org/) | Statistical visualisations |
+
+---
+
+## 👥 Team
+
+Developed by **Team 7** | AIT-582 | Spring 2025
+
+Aishwarya Sura · Adarsh Thunga · Cory Trainor · DharmpratapSingh Vaghela ·
+Sai Sriram Uppada · Sampath Kalyan Vankayala · Surthesh Velu Samy · Vani Subadhra Yelleti
 
 ---
 
