@@ -1,0 +1,157 @@
+# ------------------ 1. Imports and Setup ------------------
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import shap
+import lime
+import lime.lime_tabular
+import warnings
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
+from sklearn.inspection import PartialDependenceDisplay
+from imblearn.over_sampling import SMOTE
+
+warnings.filterwarnings("ignore")
+
+# ------------------ 2. Load and Preprocess Data ------------------
+def load_preprocess_data():
+    df = pd.read_csv("Road_Accident_Dataset.csv")
+
+    cat_cols = ['Road Condition', 'Weather Conditions', 'Urban/Rural',
+                'Driver Age Group', 'Driver Gender', 'Vehicle Condition', 'Accident Severity']
+    for col in cat_cols:
+        df[col] = LabelEncoder().fit_transform(df[col])
+
+    features = ['Traffic Volume', 'Population Density', 'Speed Limit', 'Visibility Level',
+                'Driver Alcohol Level', 'Driver Fatigue', 'Pedestrians Involved',
+                'Number of Injuries', 'Number of Fatalities', 'Emergency Response Time',
+                'Medical Cost', 'Economic Loss', 'Road Condition', 'Weather Conditions',
+                'Urban/Rural', 'Driver Age Group', 'Driver Gender', 'Vehicle Condition']
+
+    target = 'Accident Severity'
+
+    X = df[features]
+    y = df[target]
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    sm = SMOTE(random_state=42)
+    X_resampled, y_resampled = sm.fit_resample(X_scaled, y)
+
+    return df, X_resampled, y_resampled, features
+
+df, X_resampled, y_resampled, all_features = load_preprocess_data()
+
+# ------------------ 3. RQ1 - Driver-Related Factors (Logistic Regression) ------------------
+def run_rq1_logistic(df):
+    print("\n--- RQ1: Driver-Related Factors ---")
+    features = ['Driver Age Group', 'Driver Gender', 'Driver Alcohol Level', 'Driver Fatigue']
+    X = df[features]
+    y = df['Accident Severity']
+
+    X = StandardScaler().fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
+
+    model = LogisticRegression(max_iter=500)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("F1 Score (Macro):", f1_score(y_test, y_pred, average='macro'))
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+
+run_rq1_logistic(df)
+
+# ------------------ 4. RQ2 - Environmental Factors (Random Forest) ------------------
+def run_rq2_random_forest(df):
+    print("\n--- RQ2: Environmental Factors ---")
+    features = ['Traffic Volume', 'Population Density', 'Urban/Rural']
+    X = df[features]
+    y = df['Accident Severity']
+
+    X = StandardScaler().fit_transform(X)
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_resample(X, y)
+    X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.3, stratify=y_res, random_state=42)
+
+    model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("F1 Score (Macro):", f1_score(y_test, y_pred, average='macro'))
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+
+run_rq2_random_forest(df)
+
+# ------------------ 5. RQ3 - Temporal and Weather Impact (Random Forest) ------------------
+def run_rq3_random_forest(df):
+    print("\n--- RQ3: Temporal and Weather Impact ---")
+    features = ['Weather Conditions', 'Road Condition', 'Visibility Level', 'Time of Day']
+
+    df_copy = df.copy()
+    # Encode Time of Day manually
+    le = LabelEncoder()
+    df_copy['Time of Day'] = le.fit_transform(df_copy['Time of Day'])
+
+    X = df_copy[features]
+    y = df_copy['Accident Severity']
+
+    X = StandardScaler().fit_transform(X)
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_resample(X, y)
+    X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.3, stratify=y_res, random_state=42)
+
+    model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("F1 Score (Macro):", f1_score(y_test, y_pred, average='macro'))
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+
+run_rq3_random_forest(df)
+
+# ------------------ 6. RQ4 - Overall Interaction (Random Forest + SHAP + PDP) ------------------
+def run_rq4_random_forest(X_resampled, y_resampled, all_features):
+    print("\n--- RQ4: Overall Factors Interaction ---")
+
+    X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.3, stratify=y_resampled, random_state=42)
+
+    model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("F1 Score (Macro):", f1_score(y_test, y_pred, average='macro'))
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+
+    # Feature Importance Plot
+    importances = model.feature_importances_
+    indices = np.argsort(importances)
+    plt.figure(figsize=(10, 6))
+    plt.title("Feature Importances - Random Forest")
+    plt.barh(np.array(all_features)[indices], importances[indices])
+    plt.tight_layout()
+    plt.show()
+
+    # SHAP Summary Plot
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_test[:1000])
+    shap.summary_plot(shap_values, X_test[:1000], feature_names=all_features)
+
+    # PDP
+    PartialDependenceDisplay.from_estimator(
+        model, X_test[:1000], ['Driver Alcohol Level', 'Visibility Level', 'Speed Limit'],
+        feature_names=all_features, grid_resolution=20
+    )
+    plt.tight_layout()
+    plt.show()
+
+run_rq4_random_forest(X_resampled, y_resampled, all_features)
